@@ -53,6 +53,35 @@ Connect the UART while the router is powered off.
 > [!WARNING]
 > Never connect the adapter's `5V` pin to the router UART header. Do not connect UART `VCC` at all for this procedure. Only TX, RX and GND are required.
 
+### Connection diagram
+
+The following diagram shows both sides of the connection. The router points are exposed UART pads/holes, not a ready-made female socket. Soldering a small header is the most reliable method; temporary test hooks may also be used carefully.
+
+![CH341T USB-to-TTL adapter to ZX7981PG UART connection guide](images/7b4c002e-ebaa-4da6-a7b8-caf2c55e7b31.png)
+
+### UART points on the ZX7981PG board
+
+Use the board markings themselves as the final reference. From top to bottom in this photo, the pads are `TX`, `RX`, `GND` and `3V3`. Connect only the first three as shown; leave `3V3` disconnected.
+
+![Annotated ZX7981PG UART connection points](images/5fcb0645-1030-45e0-8796-3f92b7337452.png)
+
+<details>
+<summary>Open the original close-up and hardware reference photos</summary>
+
+Router UART labels and pads:
+
+![Close-up of ZX7981PG UART labels and pads](images/1.jpeg)
+
+Example CH341T USB-to-TTL adapter. Use its `TXD`, `RXD` and `GND` pins only; do not connect `VCC` or `3V3` to the router:
+
+![CH341T USB-to-TTL adapter pin header](images/4.jpeg)
+
+ZX7981PG board overview showing the modem and antenna connector area:
+
+![ZX7981PG internal board overview](images/6.jpeg)
+
+</details>
+
 ## Step 1 - Preserve and verify the firmware
 
 Put the verified firmware in a dedicated folder that will become the TFTP server root.
@@ -324,4 +353,3 @@ Do not rename a different image to the old verified filename without updating it
 ## Scope and responsibility
 
 This procedure records one successful ZX7981PG recovery. Hardware revisions and flash layouts can differ even when the product name looks the same. Verify the board, firmware source, file size and checksum before writing flash. You perform hardware access and flashing at your own risk.
-
