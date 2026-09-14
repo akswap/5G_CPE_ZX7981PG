@@ -8,6 +8,20 @@ This guide records the configuration successfully used with a Jio SIM on the ZX7
 > [!WARNING]
 > **New or recovered ZX7981PG units may not register on Jio until the modem MBN is corrected.** On the tested firmware, Jio registration started only after disabling MBN automatic selection and selecting `ROW_Commercial`. Complete section 3 before changing the APN/PDP settings. MBN inventories vary by modem firmware, so first confirm that `ROW_Commercial` exists in your own list.
 
+## Tested modem identity
+
+The unit used for this Jio procedure reported the following values directly through AT commands:
+
+| Item | Reported value |
+|---|---|
+| Manufacturer | `Quectel` |
+| Model | `RG502Q-EU` |
+| Firmware revision | `RG501QEUAAR12A01M4G_OCPU_ZM` |
+| Full firmware build | `RG501QEUAAR12A01M4G_OCPU_ZM_04.001.04.001` |
+| Hardware revision | Not reported: `AT+QHWVER` returns `ERROR` on this firmware |
+
+The modem itself reports model `RG502Q-EU` while its firmware identifier begins with `RG501Q`; both values are recorded exactly as returned. `AT+QHWVER` being unsupported is not a hardware-failure indication. If your model, firmware or MBN list differs, treat the commands below as a tested reference rather than assuming identical modem behavior.
+
 ## Working profile
 
 | Setting | Tested value |
