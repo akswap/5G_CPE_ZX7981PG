@@ -42,6 +42,8 @@ They do **not** automatically change RAT preference, MBN profile, LTE/NR bands o
 > [!IMPORTANT]
 > Read the [installation and recovery notes](docs/SIM1-SIM2-Auto-Switch.md) before copying scripts to a router. Validate them on your exact firmware and keep SSH/UART recovery access available.
 
+The repository scripts are documented reference versions and have passed shell syntax checks. Back up and compare any known-good installed version before replacing it; retest SIM1/SIM2 and every operator profile on the target router.
+
 ## Quick Jio status check
 
 ```sh
@@ -79,4 +81,3 @@ Only connect router `TX -> adapter RX`, router `RX -> adapter TX` and `GND -> GN
 Before posting logs or screenshots, remove IMEI, IMSI, ICCID, SIM phone number, MAC addresses and public IP addresses.
 
 When reporting a result, include the router firmware version, modem model/firmware, operator, RAT, band, relevant AT output and whether the test was performed while data traffic was active.
-
