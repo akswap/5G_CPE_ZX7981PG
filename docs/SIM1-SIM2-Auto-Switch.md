@@ -24,9 +24,11 @@ The live watcher does not implement a continuous PDP reconnect loop. It does not
 ## Install the SIM Auto-Profile Script v2.3.1
 Download  SIM Auto-Profile Script v2.3.1 from Asset 
 Extract the ZIP file and place the extracted folder at:
+see file Path<br> 
+
 
 ```text
-C:\ZX7981PG-SIM1-Jio-Airtel-Vi-Auto-v2.3.1
+C:\ZX7981PG-SIM1-Jio-Airtel-Vi-Auto-v2.3.1.zip\auto_profile_v2
 ```
 
 ### 1. Copy the files using Windows PowerShell
