@@ -22,7 +22,7 @@ The live watcher does not implement a continuous PDP reconnect loop. It does not
 ## Install
 
 ## Install the SIM Auto-Profile Script v2.3.1
-
+Download  SIM Auto-Profile Script v2.3.1 from Asset 
 Extract the ZIP file and place the extracted folder at:
 
 ```text
