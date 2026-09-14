@@ -1,0 +1,195 @@
+#!/bin/sh
+# ZX7981PG live active-SIM profile watcher v1.1
+# Applies an operator profile once when the active SIM identity changes.
+# Does not alter RAT preferences, bands, MBN or cell locks.
+
+TAG="sim-profile-live"
+LOCK="/tmp/sim-profile-live.lock"
+STATE="/tmp/sim-profile-live.state"
+INTERVAL=15
+
+log() {
+    logger -t "$TAG" "$*"
+    echo "$TAG: $*" >&2
+}
+
+at() {
+    local cmd="$1"
+    local escaped
+    escaped="$(printf '%s' "$cmd" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+    ubus -t 8 call lteat send "{\"cmd\":\"$escaped\"}" 2>/dev/null
+}
+
+get_imsi() {
+    at 'AT+CIMI' | tr -cd '0-9\n' | awk 'length($0)>=5 {print; exit}'
+}
+
+get_iccid() {
+    at 'AT+QCCID' | sed -n 's/.*+QCCID: *\([0-9][0-9]*\).*/\1/p' | head -n 1
+}
+
+detect_operator() {
+    local cops imsi low
+    cops="$(at 'AT+COPS?')"
+    imsi="$(get_imsi)"
+    low="$(echo "$cops" | tr 'A-Z' 'a-z')"
+
+    case "$low" in
+        *jio*|*reliance*) echo jio; return ;;
+        *airtel*) echo airtel; return ;;
+        *vodafone*|*idea*|*vi\ india*) echo vi; return ;;
+    esac
+
+    case "$imsi" in
+        405871*) echo jio ;;
+        40554*) echo airtel ;;
+        *) echo unknown ;;
+    esac
+}
+
+find_apn_index() {
+    local wanted="$1"
+    local index=0
+
+    while uci -q get "lte.@apnlist[$index]" >/dev/null; do
+        if [ "$(uci -q get "lte.@apnlist[$index].apn")" = "$wanted" ]; then
+            echo "$index"
+            return 0
+        fi
+        index=$((index + 1))
+    done
+    return 1
+}
+
+ensure_apn_profile() {
+    local name="$1"
+    local apn="$2"
+    local index section
+
+    index="$(find_apn_index "$apn")"
+    if [ -n "$index" ]; then
+        echo "$index"
+        return 0
+    fi
+
+    section="$(uci add lte apnlist)" || return 1
+    uci set "lte.$section.name=$name"
+    uci set "lte.$section.apn=$apn"
+    uci set "lte.$section.auth_type=0"
+    uci commit lte
+    find_apn_index "$apn"
+}
+
+set_profile() {
+    local operator="$1"
+    local name apn ipv6 index changed
+    changed=0
+
+    case "$operator" in
+        jio) name=jio; apn=jionet; ipv6=2 ;;
+        airtel) name=airtel; apn=airtelgprs.com; ipv6=1 ;;
+        vi) name=vi; apn=www; ipv6=1 ;;
+        *) return 1 ;;
+    esac
+
+    index="$(ensure_apn_profile "$name" "$apn")" || return 1
+    [ -z "$index" ] && return 1
+
+    if [ "$(uci -q get lte.main.apnselect)" != "$index" ]; then
+        uci set lte.main.apnselect="$index"
+        changed=1
+    fi
+    if [ "$(uci -q get lte.main.apn)" != "$apn" ]; then
+        uci set lte.main.apn="$apn"
+        changed=1
+    fi
+    if [ "$(uci -q get lte.main.ipv6)" != "$ipv6" ]; then
+        uci set lte.main.ipv6="$ipv6"
+        changed=1
+    fi
+
+    if [ "$changed" = 1 ]; then
+        uci commit lte
+        log "Saved $operator profile (apnselect=$index apn=$apn ipv6=$ipv6)"
+    fi
+
+    PROFILE_CHANGED="$changed"
+    return 0
+}
+
+main() {
+    local operator sim_id sim_key identity previous first
+
+    [ -e "$LOCK" ] && exit 0
+    : > "$LOCK"
+    trap 'rm -f "$LOCK"' EXIT
+    trap 'rm -f "$LOCK"; exit 1' INT TERM
+
+    first=1
+    log "Started; checking active SIM every $INTERVAL seconds"
+    sleep 30
+
+    while true; do
+        operator="$(detect_operator)"
+        if [ "$operator" = unknown ]; then
+            sleep "$INTERVAL"
+            continue
+        fi
+
+        sim_id="$(get_iccid)"
+        [ -z "$sim_id" ] && sim_id="$(get_imsi)"
+        [ -z "$sim_id" ] && sim_id=unavailable
+        sim_key="$(printf '%s' "$sim_id" | cksum | awk '{print $1}')"
+        identity="$operator:$sim_key"
+        previous="$(cat "$STATE" 2>/dev/null)"
+
+        PROFILE_CHANGED=0
+        if ! set_profile "$operator"; then
+            log "Unable to apply profile for $operator"
+            sleep "$INTERVAL"
+            continue
+        fi
+
+        if [ -n "$previous" ] && [ "$identity" != "$previous" ]; then
+            log "Active SIM changed; applying $operator profile and restarting LTE once"
+            printf '%s\n' "$identity" > "$STATE"
+            /etc/init.d/lte restart
+            sleep 30
+        elif [ "$PROFILE_CHANGED" = 1 ]; then
+            log "Profile changed; restarting LTE once"
+            printf '%s\n' "$identity" > "$STATE"
+            /etc/init.d/lte restart
+            sleep 30
+        else
+            printf '%s\n' "$identity" > "$STATE"
+            if [ "$first" = 1 ]; then
+                log "$operator profile already correct; no restart"
+            fi
+        fi
+
+        first=0
+        sleep "$INTERVAL"
+    done
+}
+
+case "$1" in
+    --once)
+        operator="$(detect_operator)"
+        [ "$operator" = unknown ] && { log "No supported SIM detected"; exit 1; }
+        PROFILE_CHANGED=0
+        set_profile "$operator" || exit 1
+        if [ "$PROFILE_CHANGED" = 1 ]; then
+            /etc/init.d/lte restart
+        fi
+        ;;
+    --status)
+        echo "operator=$(detect_operator)"
+        echo "apnselect=$(uci -q get lte.main.apnselect)"
+        echo "apn=$(uci -q get lte.main.apn)"
+        echo "ipv6=$(uci -q get lte.main.ipv6)"
+        exit 0
+        ;;
+    *)
+        main
+        ;;
+esac

@@ -1,0 +1,181 @@
+#!/bin/sh
+# ZX7981PG boot-time active-SIM profile selector v2.4
+# Jio:    jionet, IPv6 only
+# Airtel: airtelgprs.com, IPv4/IPv6
+# Vi:     www, IPv4/IPv6
+# Leaves RAT preferences, bands, MBN and cell locks untouched.
+
+TAG="sim-profile-onboot"
+LOCK="/tmp/sim-profile-onboot.lock"
+
+log() {
+    logger -t "$TAG" "$*"
+    echo "$TAG: $*" >&2
+}
+
+at() {
+    local cmd="$1"
+    local escaped
+    escaped="$(printf '%s' "$cmd" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+    ubus -t 8 call lteat send "{\"cmd\":\"$escaped\"}" 2>/dev/null
+}
+
+get_imsi() {
+    at 'AT+CIMI' | tr -cd '0-9\n' | awk 'length($0)>=5 {print; exit}'
+}
+
+detect_operator() {
+    local cops imsi low
+    cops="$(at 'AT+COPS?')"
+    imsi="$(get_imsi)"
+    low="$(echo "$cops" | tr 'A-Z' 'a-z')"
+
+    case "$low" in
+        *jio*|*reliance*) echo jio; return ;;
+        *airtel*) echo airtel; return ;;
+        *vodafone*|*idea*|*vi\ india*) echo vi; return ;;
+    esac
+
+    case "$imsi" in
+        405871*) echo jio ;;
+        40554*) echo airtel ;;
+        *) echo unknown ;;
+    esac
+}
+
+find_apn_index() {
+    local wanted="$1"
+    local index=0
+
+    while uci -q get "lte.@apnlist[$index]" >/dev/null; do
+        if [ "$(uci -q get "lte.@apnlist[$index].apn")" = "$wanted" ]; then
+            echo "$index"
+            return 0
+        fi
+        index=$((index + 1))
+    done
+
+    return 1
+}
+
+ensure_apn_profile() {
+    local name="$1"
+    local apn="$2"
+    local index section
+
+    index="$(find_apn_index "$apn")"
+    if [ -n "$index" ]; then
+        echo "$index"
+        return 0
+    fi
+
+    section="$(uci add lte apnlist)" || return 1
+    uci set "lte.$section.name=$name"
+    uci set "lte.$section.apn=$apn"
+    uci set "lte.$section.auth_type=0"
+    uci commit lte
+
+    find_apn_index "$apn"
+}
+
+apply_profile() {
+    local operator="$1"
+    local apnselect ipv6 profile_name profile_apn changed
+    changed=0
+
+    case "$operator" in
+        jio)
+            profile_name=jio
+            profile_apn=jionet
+            ipv6=2
+            ;;
+        airtel)
+            profile_name=airtel
+            profile_apn=airtelgprs.com
+            ipv6=1
+            ;;
+        vi)
+            profile_name=vi
+            profile_apn=www
+            ipv6=1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    apnselect="$(ensure_apn_profile "$profile_name" "$profile_apn")"
+    if [ -z "$apnselect" ]; then
+        log "Unable to find or create APN profile for $operator"
+        return 1
+    fi
+
+    if [ "$(uci -q get lte.main.apnselect)" != "$apnselect" ]; then
+        uci set lte.main.apnselect="$apnselect"
+        changed=1
+    fi
+    if [ "$(uci -q get lte.main.apn)" != "$profile_apn" ]; then
+        uci set lte.main.apn="$profile_apn"
+        changed=1
+    fi
+    if [ "$(uci -q get lte.main.ipv6)" != "$ipv6" ]; then
+        uci set lte.main.ipv6="$ipv6"
+        changed=1
+    fi
+
+    if [ "$changed" = 1 ]; then
+        uci commit lte
+        log "Saved $operator profile (apnselect=$apnselect apn=$profile_apn ipv6=$ipv6)"
+        log "Profile changed; rebooting once to apply cleanly"
+        sync
+        sleep 5
+        reboot
+    else
+        log "$operator persistent profile already correct"
+    fi
+}
+
+main() {
+    local operator attempt
+
+    [ -e "$LOCK" ] && exit 0
+    : > "$LOCK"
+    trap 'rm -f "$LOCK"' EXIT
+    trap 'rm -f "$LOCK"; exit 1' INT TERM
+
+    operator=unknown
+    attempt=0
+    while [ "$attempt" -lt 30 ]; do
+        operator="$(detect_operator)"
+        [ "$operator" != unknown ] && break
+        attempt=$((attempt + 1))
+        sleep 3
+    done
+
+    if [ "$operator" = unknown ]; then
+        log "No supported SIM detected; no changes made"
+        exit 0
+    fi
+
+    log "Detected operator=$operator"
+    apply_profile "$operator"
+}
+
+case "$1" in
+    --status)
+        echo "operator=$(detect_operator)"
+        echo "apnselect=$(uci -q get lte.main.apnselect)"
+        echo "apn=$(uci -q get lte.main.apn)"
+        echo "ipv6=$(uci -q get lte.main.ipv6)"
+        at 'AT+QNWPREFCFG="mode_pref"'
+        at 'AT+QNWPREFCFG="nr5g_disable_mode"'
+        exit 0
+        ;;
+    --run)
+        main
+        exit $?
+        ;;
+esac
+
+main
+
