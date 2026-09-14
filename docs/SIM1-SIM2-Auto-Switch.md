@@ -1,6 +1,6 @@
-# SIM1/SIM2 Automatic Operator Profile Switching
+# SIM  Automatic Operator Profile Switching
 
-The ZX7981PG can use different operators in SIM1 and SIM2. Changing the active slot in the web UI changes the modem's SIM, but the saved APN/PDP profile may still belong to the previous operator. The scripts in [`../scripts`](../scripts) address this by detecting the active SIM and applying the matching persistent profile.
+The ZX7981PG can use different operators in SIM. Changing the active slot in the web UI changes the modem's SIM, but the saved APN/PDP profile may still belong to the previous operator. The scripts in [`../scripts`](../scripts) address this by detecting the active SIM and applying the matching persistent profile.
 
 ## Profile map
 
@@ -20,6 +20,132 @@ The scripts leave `mode_pref`, LTE/NR bands, cell locks and `nr5g_disable_mode` 
 The live watcher does not implement a continuous PDP reconnect loop. It does not repeatedly restart a broken network connection.
 
 ## Install
+
+## Install the SIM Auto-Profile Script v2.3.1
+
+Extract the ZIP file and place the extracted folder at:
+
+```text
+C:\ZX7981PG-SIM1-Jio-Airtel-Vi-Auto-v2.3.1
+```
+
+### 1. Copy the files using Windows PowerShell
+
+Open **Windows PowerShell** and run:
+
+```powershell
+scp -O "C:\ZX7981PG-SIM1-Jio-Airtel-Vi-Auto-v2.3.1\auto_profile_v2\usr\bin\sim-profile-onboot" root@192.168.88.1:/tmp/sim-profile-onboot
+```
+
+```powershell
+scp -O "C:\ZX7981PG-SIM1-Jio-Airtel-Vi-Auto-v2.3.1\auto_profile_v2\etc\init.d\sim-profile-onboot" root@192.168.88.1:/tmp/sim-profile-onboot-init
+```
+
+Enter the router’s root password when prompted.
+
+If you receive an SSH host-key error, first run:
+
+```powershell
+ssh-keygen -R 192.168.88.1
+```
+
+Then repeat the two `scp` commands.
+
+### 2. Connect to the router through SSH
+
+From Windows PowerShell, run:
+
+```powershell
+ssh root@192.168.88.1
+```
+
+After logging in, the prompt should look similar to:
+
+```text
+root@OpenWrt:~#
+```
+
+All remaining commands must be executed in the router’s SSH terminal.
+
+### 3. Disable old conflicting services
+
+```sh
+/etc/init.d/sim-profile-live stop 2>/dev/null
+/etc/init.d/sim-profile-live disable 2>/dev/null
+/etc/init.d/sa-profile-switch stop 2>/dev/null
+/etc/init.d/sa-profile-switch disable 2>/dev/null
+```
+
+This prevents older profile-switching services from interfering with the new boot-time script.
+
+### 4. Verify the uploaded files
+
+Check both files for shell syntax errors:
+
+```sh
+sh -n /tmp/sim-profile-onboot
+sh -n /tmp/sim-profile-onboot-init
+```
+
+If these commands produce no output, the shell syntax is valid.
+
+Check the script version:
+
+```sh
+head -n 2 /tmp/sim-profile-onboot
+```
+
+Confirm that it identifies itself as version `v2.3.1`.
+
+### 5. Install the files
+
+```sh
+cp -f /tmp/sim-profile-onboot /usr/bin/sim-profile-onboot
+cp -f /tmp/sim-profile-onboot-init /etc/init.d/sim-profile-onboot
+chmod 755 /usr/bin/sim-profile-onboot
+chmod 755 /etc/init.d/sim-profile-onboot
+```
+
+Enable the script so that it runs automatically after every router boot:
+
+```sh
+/etc/init.d/sim-profile-onboot enable
+sync
+```
+
+Confirm that it is enabled:
+
+```sh
+/etc/init.d/sim-profile-onboot enabled && echo PROFILE_ENABLED
+```
+
+Expected result:
+
+```text
+PROFILE_ENABLED
+```
+
+### 6. Check and apply the profile for the active SIM
+
+Check the detected operator and current profile:
+
+```sh
+/usr/bin/sim-profile-onboot --statusstatus
+```
+
+Apply the correct profile for the currently active SIM:
+
+```sh
+/usr/bin/sim-profile-onboot --run
+```
+
+The script automatically detects the active Jio, Airtel or Vi SIM and applies the corresponding APN and IP mode.
+
+If the saved profile changes, the script may reboot the router once so that the new APN/PDP configuration is applied cleanly.
+
+
+
+
 
 Copy both scripts to the router:
 
