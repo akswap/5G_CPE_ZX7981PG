@@ -12,7 +12,7 @@ This repository brings together the tested UART/TFTP firmware recovery procedure
 | Guide | Purpose |
 |---|---|
 | [UART/TFTP recovery](docs/UART-TFTP-Recovery.md) | Recover the router through MediaTek U-Boot using a verified firmware image |
-| [Jio 5G SA setup](docs/Jio-5G-SA-Setup.md) | Configure `jionet`, IPv6-only PDP, n78 checks and automatic 464XLAT |
+| [Jio 5G SA setup](docs/Jio-5G-SA-Setup.md) | Apply the tested `ROW_Commercial` MBN prerequisite, then configure `jionet`, IPv6-only PDP, n78 and 464XLAT |
 | [Airtel 5G NSA setup](docs/Airtel-5G-NSA-Setup.md) | Configure dual stack and distinguish LTE carrier aggregation from active NSA |
 | [SIM1/SIM2 automatic profiles](docs/SIM1-SIM2-Auto-Switch.md) | Automatically apply Jio, Airtel or Vi APN/PDP settings when the active SIM changes |
 
@@ -24,7 +24,7 @@ This repository brings together the tested UART/TFTP firmware recovery procedure
 | Airtel | `airtelgprs.com` | `1` | `quectel-CM -4 -6 -s airtelgprs.com` |
 | Vi | `www` | `1` | `quectel-CM -4 -6 -s www` |
 
-Jio was tested on **NR5G-SA TDD n78** with a native IPv6 session and OpenWrt-created 464XLAT interface for IPv4 compatibility. Airtel NSA requires an LTE anchor and an attached n78 secondary carrier.
+Jio was tested on **NR5G-SA TDD n78** with a native IPv6 session and OpenWrt-created 464XLAT interface for IPv4 compatibility. On the tested new/recovered CPE, Jio registration also required MBN `AutoSel=0` with `ROW_Commercial` selected; follow the Jio guide before applying APN settings. Airtel NSA requires an LTE anchor and an attached n78 secondary carrier.
 
 ## Scripts
 
