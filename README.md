@@ -7,6 +7,29 @@ This repository brings together the tested UART/TFTP firmware recovery procedure
 > [!CAUTION]
 > This is an independent community project, not official vendor or OpenWrt support. Hardware revisions and modem firmware can differ. Back up the router configuration and factory/calibration data before making changes.
 
+## Tested hardware and modem identification
+
+These are the values returned by the actual recovered/tested unit, not values inferred from the product name:
+
+| Item | Device-reported value | AT command |
+|---|---|---|
+| CPE product | `ZX7981PG` | Router product/UI identification |
+| Modem manufacturer | `Quectel` | `AT+CGMI` |
+| Modem model | `RG502Q-EU` | `ATI` / `AT+CGMM` |
+| Firmware revision | `RG501QEUAAR12A01M4G_OCPU_ZM` | `AT+CGMR` |
+| Full firmware build | `RG501QEUAAR12A01M4G_OCPU_ZM_04.001.04.001` | `AT+QGMR` |
+| Modem hardware revision | Not reported (`ERROR`) | `AT+QHWVER` is unsupported on the tested firmware |
+
+The `RG502Q-EU` model string and `RG501Q...` firmware identifier are both reported by the same tested modem. Do not rename or “correct” either value in documentation. `AT+QHWVER` returning `ERROR` only means that command is unsupported; it does not indicate faulty hardware. Other ZX7981PG production batches may contain a different module or firmware; verify every unit with AT commands.
+
+```sh
+ubus -t 10 call lteat send '{"cmd":"ATI"}'
+ubus -t 10 call lteat send '{"cmd":"AT+CGMM"}'
+ubus -t 10 call lteat send '{"cmd":"AT+CGMR"}'
+ubus -t 10 call lteat send '{"cmd":"AT+QGMR"}'
+ubus -t 10 call lteat send '{"cmd":"AT+QHWVER"}'
+```
+
 ## Guides
 
 | Guide | Purpose |
